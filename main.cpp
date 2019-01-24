@@ -14,7 +14,7 @@ using namespace std;
 
 
 
-static int N = 300;									// ilosc elementow tablicy u
+static int N = 300;									// ilosc podzialow boku kwadratu
 static double dokladnosc = 1e-5;					// dokladnosc obliczenia
 static double h = 1./N;								// odleglosc oczek siatki
 static double alfa = 0.5;							// wspolczynnik relaksacji
