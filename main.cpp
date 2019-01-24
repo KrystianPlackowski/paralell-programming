@@ -14,7 +14,7 @@ using namespace std;
 
 
 
-static int N = 300;									// ilosc podzialow boku kwadratu
+static int N = 250;									// ilosc podzialow boku kwadratu
 static double dokladnosc = 1e-5;					// dokladnosc obliczenia
 static double h = 1./N;								// odleglosc oczek siatki
 static double alfa = 0.5;							// wspolczynnik relaksacji
@@ -446,8 +446,8 @@ int main ( int argc, char *argv[] ) {
 
 		// zbierz wyniki ze wszystkich watkow:
 		//
-		k = 1;
-		for( j = 0; j < size[0]; j++)	// najpierw z watku nr 1 (glownego)
+		k = 0;
+		for( j = 0; j < size[0]+1; j++)	// najpierw z watku nr 1 (glownego)
 			copy( u[j], u[j]+N, v[k++]);
 
 		
@@ -458,6 +458,8 @@ int main ( int argc, char *argv[] ) {
 
 
 		rysuj_kolorowy_wykres( "laplasjan.bmp", v);
+		
+		
 		
 		
 		
