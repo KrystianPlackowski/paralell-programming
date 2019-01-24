@@ -1,8 +1,4 @@
 #include <mpi.h>
-/*
-mpic++ main.cpp -o foo
-mpirun -np 4 foo
-*/
 #include <iostream>
 #include <stdio.h>
 #include <math.h>
@@ -18,11 +14,15 @@ using namespace std;
 
 
 
-static int N = 500;									// ilosc elementow tablicy u
+static int N = 300;									// ilosc elementow tablicy u
+static double dokladnosc = 1e-5;					// dokladnosc obliczenia
 static double h = 1./N;								// odleglosc oczek siatki
 static double alfa = 0.5;							// wspolczynnik relaksacji
 
 
+
+// funkcja zwracajaca czas z duza dokladnoscia:
+//
 double GetTickCount(void) 
 {
 	struct timespec now;
@@ -32,8 +32,8 @@ double GetTickCount(void)
 }
 
 
-
-// zamiana koloru HSV na kolor RGB
+// zamiana koloru HSV na kolor RGB:
+//
 void hsv2rgb(double hue, double sat, double val, double &red, double &grn, double &blu) { 
 
 	double i, f, p, q, t;
@@ -60,7 +60,8 @@ void hsv2rgb(double hue, double sat, double val, double &red, double &grn, doubl
 }
 
 
-// kolorowy wykres danego pola
+// kolorowy wykres danego pola:
+//
 void rysuj_kolorowy_wykres(string s, double **pole) {
 
 
@@ -165,8 +166,8 @@ void rysuj_kolorowy_wykres(string s, double **pole) {
 	
 	
 	
-
-
+// obliczenia na watku nr q az do zbieznosci:
+//
 void foo( int q, int MODS, int size, double **u) {
 	// 		  ^		  ^
 	// numer watku oraz ilosc watkow
@@ -206,7 +207,7 @@ void foo( int q, int MODS, int size, double **u) {
 	eps = INF;
 	// wykonaj k iteracji:
 	//
-	for( k = 0; sqrt(eps) > 2e-4; k++) {
+	for( k = 0; sqrt(eps) > dokladnosc; k++) {
 		
 		
 		// wyslij watkom poprzedniemu i nastepnemu gorny i dolny wiersz LICZONEJ CZESCI tablicy:
@@ -295,7 +296,7 @@ void foo( int q, int MODS, int size, double **u) {
 			
 			//printf( "watek nr %d policzony w %d/10\n", q+1, k/1000);
 			if( q == 0)
-				printf("nr watka = %d, iter = %d, eps = %.6E\n", q+1, k, sqrt(eps));
+				printf("iteracje = %d, epsilon = %.6E\n", k, sqrt(eps));
 		}
 		
 	}
@@ -371,12 +372,13 @@ int main ( int argc, char *argv[] ) {
 
 	// ustal rozmiary fragmentow tablic, ktore zostana przekazane poszczegolnym watkom:
 	//
-	for( q = 0; q < MODS-1; q++)
-		size[q] = (N-2) / MODS + ( (N-2) % MODS > 0 );
+	for( q = 0; q < MODS; q++)
+		size[q] = (N-2) / MODS;
 	
-	// ostatni watek dostaje mniejsza tablice:
+	// pierwsze kilka watkow dostanie o 1 wiekszy rozmiar niz pozostale:
 	//
-	size[MODS-1] = (N-2) - (MODS-1) * size[MODS-2];
+	for( q = 0; q < (N-2) - (N-2) / MODS * MODS; q++)
+		size[q]++;
 	
 	
 	
@@ -388,7 +390,7 @@ int main ( int argc, char *argv[] ) {
 	if( id == 0) {
 		
 
-		printf( "[");
+		printf( "sposob podzialu wierszy tablicy na watki:\n[");
 		for( q = 0; q < MODS; q++)
 			printf( "%d ", size[q]);
 		printf("]\n");
@@ -446,7 +448,7 @@ int main ( int argc, char *argv[] ) {
 		//
 		k = 1;
 		for( j = 0; j < size[0]; j++)	// najpierw z watku nr 1 (glownego)
-			copy( u[j], u[j]+N+1, v[k++]);
+			copy( u[j], u[j]+N, v[k++]);
 
 		
 		for( i = 1; i < MODS; i++)		// potem z pozostalych watkow
@@ -486,8 +488,7 @@ int main ( int argc, char *argv[] ) {
 	
 	
 	
-	
-	printf( "terminuje watek nr %d\n", id+1);
+
 	
 	
 	for( i = 0; i <= size[id]+1; i++)
@@ -496,6 +497,8 @@ int main ( int argc, char *argv[] ) {
 	
 	delete [] u;
 	delete [] size;
+		
+	printf( "terminuje watek nr %d\n", id+1);
 
 	MPI_Finalize ( );
 	
