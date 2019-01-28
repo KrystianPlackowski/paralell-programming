@@ -23,7 +23,7 @@ static double alfa = 0.5;							// wspolczynnik relaksacji
 
 // funkcja zwracajaca czas z duza dokladnoscia:
 //
-double GetTickCount(void) 
+double GetTickCount(void)
 {
 	struct timespec now;
 	if (clock_gettime(CLOCK_MONOTONIC, &now))
@@ -34,7 +34,7 @@ double GetTickCount(void)
 
 // zamiana koloru HSV na kolor RGB:
 //
-void hsv2rgb(double hue, double sat, double val, double &red, double &grn, double &blu) { 
+void hsv2rgb(double hue, double sat, double val, double &red, double &grn, double &blu) {
 
 	double i, f, p, q, t;
 
@@ -65,8 +65,8 @@ void hsv2rgb(double hue, double sat, double val, double &red, double &grn, doubl
 void rysuj_kolorowy_wykres(string s, double **pole) {
 
 
-	unsigned char *img = new unsigned char[54 + 3 * N*N];	
-	
+	unsigned char *img = new unsigned char[54 + 3 * N*N];
+
 	int i, j;
 	double mn = INF, mx = -INF, MN = INF;
 
@@ -156,88 +156,87 @@ void rysuj_kolorowy_wykres(string s, double **pole) {
 		fwrite(img + (w*(h - i - 1) * 3), 3, w, f);
 		fwrite(bmppad, 1, (4 - (w * 3) % 4) % 4, f);
 	}
-	
+
 	fclose(f);
-	
+
 	delete [] img;
 }
-	
-	
-	
-	
-	
+
+
+
+
+
 // obliczenia na watku nr q az do zbieznosci:
 //
 void foo( int q, int MODS, int size, double **u) {
 	// 		  ^		  ^
 	// numer watku oraz ilosc watkow
-	
-	
+
+
 	MPI_Status status;
 	MPI_Request request;
 	int i, j, k;
 	double u_p, eps, eps_rest;
-	
-	
-	
-	
+
+
+
 	// stworz tablice pomocnicza **u_new, zapisujaca nastepny krok iteracji, nie nadpisujac poprzedniego:
 	//
 	double **u_new = new double * [size+2];
-	
+
 	for( i = 0; i <= size+1; i++)
 		u_new[i] = new double[N];
-		
 
-	
-	
-	
-	
-	
+
+
+
+
+
+
 	// pierwsze "przyblizenie" rozwiazania **u wraz z warunkami brzegowymi:
 	//
 	for( i = 0; i <= size+1; i++)
 		for( j = 0; j < N; j++)
 			u[i][j] = 0;
-			
 
-	
-	
+
+
+
 
 	eps = INF;
 	// wykonaj k iteracji:
 	//
-	for( k = 0; sqrt(eps) > dokladnosc; k++) {
-		
-		
+	for( k = 0; eps > dokladnosc; k++) {
+
+
 		// wyslij watkom poprzedniemu i nastepnemu gorny i dolny wiersz LICZONEJ CZESCI tablicy:
 		//
-		
+
 		if( q-1 >= 0)
 			MPI_Isend ( u[1], N, MPI_DOUBLE, q-1, 0, MPI_COMM_WORLD, &request);
 		if( q+1 < MODS)
 			MPI_Isend ( u[size], N, MPI_DOUBLE, q+1, 0, MPI_COMM_WORLD, &request);
-		
-		
-		
+
+
+
 
 		// otrzymaj gorny i dolny wiersz od watkow poprzedniego i nastepnego: (TYLKO DO ODCZYTU)
 		//
-		
+
 		if( q-1 >= 0)
 			MPI_Recv ( u[0], N, MPI_DOUBLE, q-1, 0, MPI_COMM_WORLD, &status );
 		if( q+1 < MODS)
 			MPI_Recv ( u[size+1], N, MPI_DOUBLE, q+1, 0, MPI_COMM_WORLD, &status );
-		
-	
-	
-	
-	
 
-		eps = 0;
-	
+
+
+
+
+
 		// wykonaj 1 iteracje na kazdym "wewnetrznym" elemencie tablicy:
 		//
+        eps = 0;
+
 		for( i = 1; i <= size; i++)
 			for( j = 1; j <= N-2; j++) {
 				
@@ -249,58 +248,67 @@ void foo( int q, int MODS, int size, double **u) {
 			}
 
 
-		
-		
+        // **u_new := **u
+		//
+		for( i = 1; i <= size; i++)
+			for( j = 1; j <= N-2; j++)
+				u[i][j] = u_new[i][j];
+
+
+
+
+
+
+
+
 		// watek glowny sumuje eps nadeslane ze wszystkich watkow:
 		//
 		if( q != 0) {
-			
+
 			// najpierw wyslij glownemu watkowi swoja czesc sumy:
 			//
-			MPI_Ssend ( &eps, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-			
+			MPI_Send ( &eps, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+
 			// nastepnie odbierz od niego sume wszystkich:
 			//
 			MPI_Recv ( &eps, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
 		}
 		else {
-			
+
 			// najpierw odbierz eps od wszystkich watkow i zsumuj:
 			//
 			for( i = 1; i < MODS; i++) {
-				
+
 				MPI_Recv ( &eps_rest, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &status);
 				eps += eps_rest;
 			}
-			
+
+
 			// nastepnie odeslij kazdemu watkowi sume:
 			//
+			eps = sqrt(eps);
+
 			for( i = 1; i < MODS; i++)
 				MPI_Send ( &eps, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
 		}
-	
-	
-	
-	
-	
-		// **u_new := **u
-		//
-		for( i = 1; i <= size; i++)
-			for( j = 1; j <= N-2; j++)
-				u[i][j] = u_new[i][j];
-		
-		
-		
-		
+
+
+
+
+
+
+
+
+
 		if( k % 1000 == 0 && k > 0) {
-			
+
 			//printf( "watek nr %d policzony w %d/10\n", q+1, k/1000);
 			if( q == 0)
-				printf("iteracje = %d, epsilon = %.6E\n", k, sqrt(eps));
+				printf("iteracje = %d, epsilon = %.6E\n", k, eps);
 		}
-		
+
 	}
-	
+
 
 
 
@@ -309,18 +317,18 @@ void foo( int q, int MODS, int size, double **u) {
 	//
 	for( i = 0; i <= size+1; i++)
 		delete [] u_new[i];
-		
+
 	delete [] u_new;
-	
 
 
 
 
-	
-	// wyslij wyniki glownemu watkowi (nr 1):
+
+
+	// wyslij wyniki glownemu watkowi (nr 0):
 	//
-	if( q != 0)		// nie wysylaj do siebie ( watek 1 -/-> watek 1)
-		for( i = 1; i <= size; i++) 
+	if( q != 0)		// nie wysylaj do siebie ( watek 0 -/-> watek 0)
+		for( i = 1; i <= size; i++)
 			MPI_Send ( u[i], N, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
 }
 
@@ -330,17 +338,20 @@ void foo( int q, int MODS, int size, double **u) {
 
 
 int main ( int argc, char *argv[] ) {
-	
+
 	int id;
 	int MODS;
+	int nameLen;
+	char procName[MPI_MAX_PROCESSOR_NAME];
 	MPI_Status status;
 	MPI_Request request;
-  
-  
+
+
+
 	//  Initialize MPI.
 	MPI_Init ( &argc, &argv );
-	
-	
+
+
 	//  Get the number of processes.
 	//
 	MPI_Comm_size ( MPI_COMM_WORLD, &MODS );
@@ -348,68 +359,73 @@ int main ( int argc, char *argv[] ) {
 	//  Get the individual process ID.
 	//
 	MPI_Comm_rank ( MPI_COMM_WORLD, &id );
-	
-	
-	
+	//
+	//	Get Processor name:
+	//
+	MPI_Get_processor_name( procName, &nameLen );
 
-	printf( "zaczynam watek nr %d\n", id+1);
-	
-	
-	
-	
-	
+
+
+
+
+	printf( "zaczynam watek nr %d na %s\n", id+1, procName);
+
+
+
+
+
 	int i, j, k, q;
 	double t;
-	
-	
+
+
 
 
 
 	// tablica rozmiarow tablic, ktore otrzymaja poszczegolne watki: (znana wszystkim watkom)
 	//
 	int *size = new int[MODS];
-	
+
 
 	// ustal rozmiary fragmentow tablic, ktore zostana przekazane poszczegolnym watkom:
 	//
 	for( q = 0; q < MODS; q++)
 		size[q] = (N-2) / MODS;
-	
+
 	// pierwsze kilka watkow dostanie o 1 wiekszy rozmiar niz pozostale:
 	//
 	for( q = 0; q < (N-2) - (N-2) / MODS * MODS; q++)
 		size[q]++;
-	
-	
-	
-	
+
+
+
+
 
 
 	// wypisz sposob rozdzielenia tablicy na watki:
 	//
 	if( id == 0) {
-		
+
 
 		printf( "sposob podzialu wierszy tablicy na watki:\n[");
 		for( q = 0; q < MODS; q++)
 			printf( "%d ", size[q]);
 		printf("]\n");
 	}
-		
+
 	// zacznij mierzyc czas wykonania programu:
 	//
 	if( id == 0) {
 
 		t = GetTickCount();
 	}
-	
-	
-	
-	
 
 
 
-	
+
+
+
+
+
 
 	// stworz tablice **u dla watku, powiekszona o 2 wiersze (gorny i dolny):
 	//
@@ -417,9 +433,9 @@ int main ( int argc, char *argv[] ) {
 
 	for( i = 0; i <= size[id]+1; i++)
 		u[i] = new double[N];
-	
-	
-	
+
+
+
 	// glowna czesc programu - obliczenia:
 	//
 	foo( id, MODS, size[id], u);
@@ -428,20 +444,20 @@ int main ( int argc, char *argv[] ) {
 
 
 
-	
+
 
 
 	// stworz tablice dynamiczna do prezentacji wynikow:
 	//
 	if (id == 0) {
-		
+
 		double **v;
-	
+
 		v = new double * [N];
-	
+
 		for( i = 0; i < N; i++)
 			v[i] = new double[N];
-	
+
 
 
 		// zbierz wyniki ze wszystkich watkow:
@@ -450,7 +466,7 @@ int main ( int argc, char *argv[] ) {
 		for( j = 0; j < size[0]+1; j++)	// najpierw z watku nr 1 (glownego)
 			copy( u[j], u[j]+N, v[k++]);
 
-		
+
 		for( i = 1; i < MODS; i++)		// potem z pozostalych watkow
 			for( j = 0; j < size[i]; j++)
 				MPI_Recv ( v[k++], N, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &status );
@@ -458,52 +474,52 @@ int main ( int argc, char *argv[] ) {
 
 
 		rysuj_kolorowy_wykres( "laplasjan.bmp", v);
-		
-		
-		
-		
-		
+
+
+
+
+
 		for( i = 0; i < N; i++)
 			delete [] v[i];
-	
-	
+
+
 		delete [] v;
 	}
-	
 
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
 	if( id == 0) {
-		
+
 		printf( "czas wykonania programu = %lfs\n", (GetTickCount()-t) / 1000);
-		
+
 		FILE *f = fopen( "result.txt", "a");
-		
+
 		fprintf( f, "czas wykonania programu na liczbie watkow %d wynosi %lfs\n", MODS, (GetTickCount()-t) / 1000);
 		fclose(f);
 	}
-	
-	
-	
-	
 
-	
-	
+
+
+
+
+
+
 	for( i = 0; i <= size[id]+1; i++)
 		delete [] u[i];
-		
-	
+
+
 	delete [] u;
 	delete [] size;
-		
-	printf( "terminuje watek nr %d\n", id+1);
+
+	printf( "terminuje watek nr %d na %s\n", id+1, procName);
 
 	MPI_Finalize ( );
-	
+
 
 
 	return 0;
